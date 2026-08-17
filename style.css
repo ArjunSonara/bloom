@@ -1,0 +1,377 @@
+/* ==========================================================================
+   MAISON DE BLOOM — PURE FULL-SCREEN CINEMATIC SCROLL
+   ========================================================================== */
+
+:root {
+  --bg-dark: #0a0809;
+  
+  --rose-primary: #e5989b;
+  --rose-light: #fcd5ce;
+  --rose-glow: rgba(229, 152, 155, 0.35);
+
+  --gold-primary: #d4af37;
+  --gold-light: #f7e7b4;
+  --gold-gradient: linear-gradient(135deg, #f7e7b4 0%, #d4af37 50%, #aa8010 100%);
+  --gold-glow: rgba(212, 175, 55, 0.4);
+
+  --text-main: #ffffff;
+  --text-muted: #d0c2c8;
+  --text-dim: #8e7d86;
+
+  --border-glass: rgba(247, 214, 224, 0.16);
+  --border-gold: rgba(212, 175, 55, 0.4);
+
+  --font-serif: 'Cormorant Garamond', Georgia, serif;
+  --font-sans: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+  --transition-smooth: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Reset */
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  background-color: var(--bg-dark);
+  color: var(--text-main);
+  font-family: var(--font-sans);
+  font-size: 16px;
+  overflow-x: hidden;
+}
+
+body {
+  background-color: var(--bg-dark);
+  color: var(--text-main);
+  min-height: 100vh;
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ==========================================================================
+   PRELOADER
+   ========================================================================== */
+.preloader {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: radial-gradient(circle at center, #1e151b 0%, #080608 100%);
+  transition: opacity 0.6s var(--transition-smooth), visibility 0.6s ease;
+}
+
+.preloader.fade-out {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.preloader-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  width: 90%;
+  max-width: 360px;
+}
+
+.preloader-crest {
+  font-size: 2.2rem;
+  color: var(--gold-primary);
+  margin-bottom: 1rem;
+  filter: drop-shadow(0 0 12px var(--gold-glow));
+  animation: pulseCrest 2s ease-in-out infinite;
+}
+
+@keyframes pulseCrest {
+  0%, 100% { transform: scale(0.95); opacity: 0.8; }
+  50% { transform: scale(1.06); opacity: 1; filter: drop-shadow(0 0 20px var(--gold-glow)); }
+}
+
+.preloader-title {
+  font-family: var(--font-serif);
+  font-size: 1.6rem;
+  letter-spacing: 0.2em;
+  font-weight: 400;
+  margin-bottom: 1.5rem;
+  background: linear-gradient(180deg, #fff 0%, #fbd5dc 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.preloader-bar {
+  width: 100%;
+  height: 3px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 3px;
+  overflow: hidden;
+  margin-bottom: 0.75rem;
+}
+
+.preloader-fill {
+  width: 0%;
+  height: 100%;
+  background: var(--gold-gradient);
+  transition: width 0.1s ease-out;
+  box-shadow: 0 0 8px var(--gold-glow);
+}
+
+.preloader-pct {
+  font-size: 0.75rem;
+  letter-spacing: 0.1em;
+  color: var(--gold-light);
+}
+
+/* ==========================================================================
+   PARTICLES CANVAS
+   ========================================================================== */
+.particles-canvas {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  pointer-events: none;
+  z-index: 30;
+}
+
+
+
+/* ==========================================================================
+   FIXED FULLSCREEN CANVAS CONTAINER (PERMANENTLY PINNED VIEWPORT)
+   ========================================================================== */
+.fixed-canvas-container {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+  z-index: 1;
+  background: #000;
+}
+
+#scroll-canvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.cinematic-vignette {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse at center, transparent 40%, rgba(10, 8, 9, 0.5) 100%),
+              linear-gradient(180deg, rgba(10, 8, 9, 0.3) 0%, transparent 20%, transparent 80%, rgba(10, 8, 9, 0.6) 100%);
+  pointer-events: none;
+}
+
+/* Virtual Scroll Spacer on Page */
+.virtual-scroll-spacer {
+  height: 480vh; /* Smooth, deep scroll travel length */
+  width: 100%;
+  pointer-events: none;
+}
+
+/* ==========================================================================
+   CINEMATIC FLOATING CAPTIONS
+   ========================================================================== */
+.cinematic-overlays {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 20;
+}
+
+.cinema-step {
+  position: absolute;
+  pointer-events: auto;
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(20px);
+  transition: opacity 0.5s var(--transition-smooth), transform 0.5s var(--transition-smooth), visibility 0.5s ease;
+  text-shadow: 0 4px 30px rgba(0, 0, 0, 0.9);
+}
+
+.cinema-step.active {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0) !important;
+}
+
+/* Hero Opening Title */
+.cinema-hero {
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%) translateY(20px);
+  text-align: center;
+  width: 90%;
+  max-width: 720px;
+}
+.cinema-hero.active {
+  transform: translate(-50%, -50%) translateY(0) !important;
+}
+
+.cinema-tag {
+  display: inline-block;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  color: var(--gold-light);
+  margin-bottom: 0.85rem;
+}
+
+.cinema-main-title {
+  font-family: var(--font-serif);
+  font-size: clamp(3rem, 6vw, 5.2rem);
+  letter-spacing: 0.12em;
+  line-height: 1.05;
+  margin-bottom: 0.5rem;
+  background: linear-gradient(180deg, #ffffff 0%, #fbd5dc 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  filter: drop-shadow(0 6px 30px rgba(0, 0, 0, 0.95));
+}
+
+.cinema-sub {
+  font-family: var(--font-serif);
+  font-size: clamp(1.15rem, 2.2vw, 1.45rem);
+  font-style: italic;
+  color: var(--text-muted);
+  letter-spacing: 0.05em;
+  margin-bottom: 2rem;
+}
+
+.minimal-scroll-cue {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.cue-mouse {
+  width: 22px;
+  height: 36px;
+  border: 1.5px solid var(--rose-primary);
+  border-radius: 12px;
+  position: relative;
+  box-shadow: 0 0 10px var(--rose-glow);
+}
+
+.cue-dot {
+  position: absolute;
+  top: 6px;
+  left: 50%;
+  width: 4px;
+  height: 6px;
+  background: var(--gold-primary);
+  border-radius: 2px;
+  transform: translateX(-50%);
+  animation: cueScroll 2s infinite ease-in-out;
+}
+
+@keyframes cueScroll {
+  0% { opacity: 1; transform: translateX(-50%) translateY(0); }
+  100% { opacity: 0; transform: translateX(-50%) translateY(14px); }
+}
+
+.cue-text {
+  font-size: 0.75rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+/* Chapter Overlays */
+.cinema-bottom-left {
+  bottom: 5rem;
+  left: 5rem;
+  max-width: 440px;
+}
+
+.cinema-bottom-right {
+  bottom: 5rem;
+  right: 5rem;
+  max-width: 440px;
+  text-align: right;
+}
+
+.cinema-center-end {
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%) translateY(20px);
+  text-align: center;
+  max-width: 580px;
+}
+.cinema-center-end.active {
+  transform: translate(-50%, -50%) translateY(0) !important;
+}
+
+.cinema-chapter {
+  display: block;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.22em;
+  color: var(--gold-light);
+  margin-bottom: 0.4rem;
+}
+
+.cinema-heading {
+  font-family: var(--font-serif);
+  font-size: clamp(2rem, 3.5vw, 2.8rem);
+  line-height: 1.15;
+  color: #fff;
+  margin-bottom: 0.5rem;
+}
+
+.cinema-desc {
+  font-size: 1rem;
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+
+
+
+/* Toast */
+.toast-container {
+  position: fixed;
+  bottom: 2rem;
+  left: 2rem;
+  z-index: 2000;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  pointer-events: none;
+}
+
+.toast-item {
+  background: rgba(22, 17, 20, 0.95);
+  border: 1px solid var(--border-gold);
+  border-radius: 8px;
+  padding: 0.75rem 1.2rem;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  color: #fff;
+  font-size: 0.8rem;
+  animation: slideToast 0.3s ease forwards;
+}
+
+@keyframes slideToast {
+  from { transform: translateY(20px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+/* Mobile */
+@media (max-width: 768px) {
+  .cinema-bottom-left, .cinema-bottom-right {
+    left: 2rem;
+    right: 2rem;
+    bottom: 3.5rem;
+    text-align: center;
+  }
+}

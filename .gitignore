@@ -1,0 +1,12 @@
+# Dependencies & OS
+node_modules/
+.DS_Store
+Thumbs.db
+*.log
+
+# Heavy video & scratch assets
+video/
+*.mp4
+*.zip
+realesrgan*
+.vercel

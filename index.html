@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Maison de Bloom — The Sanctuary of Eternal Spring</title>
+  <meta name="description" content="An immersive scroll-driven journey through the blooming floral palace of Maison de Bloom.">
+  
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,400&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  
+  <!-- FontAwesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <!-- Minimal Preloader with live counter -->
+  <div id="preloader" class="preloader">
+    <div class="preloader-content">
+      <div class="preloader-crest">
+        <i class="fa-solid fa-spa"></i>
+      </div>
+      <h2 class="preloader-title">MAISON DE BLOOM</h2>
+      <div class="preloader-bar">
+        <div id="progress-fill" class="preloader-fill"></div>
+      </div>
+      <span id="load-percentage" class="preloader-pct">Loading Sanctuary... 0%</span>
+    </div>
+  </div>
+
+  <!-- Ambient Floating Petals -->
+  <canvas id="particles-canvas" class="particles-canvas"></canvas>
+
+
+
+  <!-- FIXED FULL-SCREEN CINEMATIC CANVAS (100% Unobstructed Video Walkthrough) -->
+  <div class="fixed-canvas-container" id="fixedCanvasContainer">
+    <canvas id="scroll-canvas"></canvas>
+    <div class="cinematic-vignette"></div>
+
+    <!-- Minimalist Floating Cinematic Captions -->
+    <div class="cinematic-overlays">
+      
+      <!-- Hero Title (0% - 14%) -->
+      <div class="cinema-step cinema-hero active" id="step-0">
+        <span class="cinema-tag">PARFUMERIE BOTANIQUE</span>
+        <h1 class="cinema-main-title">MAISON DE BLOOM</h1>
+        <p class="cinema-sub">Sanctuary of Eternal Blossoms</p>
+        <div class="minimal-scroll-cue">
+          <span class="cue-mouse">
+            <span class="cue-dot"></span>
+          </span>
+          <span class="cue-text">Scroll down to walk through</span>
+        </div>
+      </div>
+
+      <!-- Chapter 1 (18% - 38%) -->
+      <div class="cinema-step cinema-bottom-left" id="step-1">
+        <span class="cinema-chapter">01 // THE COLONNADE</span>
+        <h2 class="cinema-heading">Rose Archways</h2>
+        <p class="cinema-desc">Centifolia roses blooming under soft morning light.</p>
+      </div>
+
+      <!-- Chapter 2 (42% - 62%) -->
+      <div class="cinema-step cinema-bottom-right" id="step-2">
+        <span class="cinema-chapter">02 // THE WALKWAY</span>
+        <h2 class="cinema-heading">Velvet Petal Carpet</h2>
+        <p class="cinema-desc">Ten thousand petals guiding your path through the palace.</p>
+      </div>
+
+      <!-- Chapter 3 (66% - 84%) -->
+      <div class="cinema-step cinema-bottom-left" id="step-3">
+        <span class="cinema-chapter">03 // THE ALCHEMY</span>
+        <h2 class="cinema-heading">Gilded Distillation</h2>
+        <p class="cinema-desc">Hand-hammered brass vessels capturing pure floral soul.</p>
+      </div>
+
+      <!-- Chapter 4 (88% - 100%) -->
+      <div class="cinema-step cinema-center-end" id="step-4">
+        <span class="cinema-chapter">04 // THE INNER SANCTUM</span>
+        <h2 class="cinema-heading">The Portal of Whispers</h2>
+        <p class="cinema-desc">Welcome to the Inner Sanctuary.</p>
+      </div>
+
+    </div>
+
+
+  </div>
+
+  <!-- Scroll Track (Determines scroll depth for walking through the video) -->
+  <div class="virtual-scroll-spacer" id="scrollSpacer"></div>
+
+  <!-- Minimal Toast -->
+  <div class="toast-container" id="toastContainer"></div>
+
+  <!-- Core Script -->
+  <script src="app.js"></script>
+</body>
+</html>

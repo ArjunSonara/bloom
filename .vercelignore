@@ -1,0 +1,7 @@
+# Vercel Ignore
+video/
+*.mp4
+.git
+.github
+*.log
+realesrgan*
