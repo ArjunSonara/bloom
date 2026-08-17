@@ -1,6 +1,6 @@
 /**
  * ============================================================================
- * MAISON DE BLOOM — PURE FULL-SCREEN CINEMATIC SCROLL ENGINE
+ * MAISON DE BLOOM — 60-120 FPS ULTRA-SMOOTH CINEMATIC SCROLL ENGINE
  * 100% Focused on the Floral Palace Walkthrough
  * ============================================================================
  */
@@ -9,7 +9,7 @@
   'use strict';
 
   const TOTAL_FRAMES = 430;
-  const FRAME_PATH = (i) => `frames/frame_${String(i).padStart(4, '0')}.jpg`;
+  const FRAME_PATH = (i) => `frames/frame_${String(i).padStart(4, '0')}.webp`;
 
   const images = new Array(TOTAL_FRAMES + 1);
   const isLoaded = new Array(TOTAL_FRAMES + 1).fill(false);
@@ -27,7 +27,7 @@
   const loadPercentage = document.getElementById('load-percentage');
 
   const canvas = document.getElementById('scroll-canvas');
-  const ctx = canvas ? canvas.getContext('2d', { alpha: false }) : null;
+  const ctx = canvas ? canvas.getContext('2d', { alpha: false, desynchronized: true }) : null;
   const steps = [
     { el: document.getElementById('step-0'), min: 0, max: 0.14 },
     { el: document.getElementById('step-1'), min: 0.18, max: 0.38 },
@@ -38,34 +38,33 @@
 
   /**
    * ==========================================================================
-   * 1. CONCURRENT & ON-DEMAND FRAME PRELOADER
+   * 1. ULTRA-FAST ASYNC PRELOADER WITH PRE-DECODING
    * ==========================================================================
    */
   function initPreloader() {
-    // 1. Immediately request the first frame
+    // 1. Immediately request & decode the first frame
     loadSingleFrame(1, () => {
       resizeCanvas();
       renderFrame(1);
     });
 
-    // 2. Pre-fetch anchor keyframes every 12 frames across the whole video
-    // This gives instant global responsiveness across the entire scroll timeline
+    // 2. Pre-fetch anchor keyframes across the whole timeline
     const anchors = [];
-    for (let i = 1; i <= TOTAL_FRAMES; i += 12) anchors.push(i);
+    for (let i = 1; i <= TOTAL_FRAMES; i += 10) anchors.push(i);
     if (anchors[anchors.length - 1] !== TOTAL_FRAMES) anchors.push(TOTAL_FRAMES);
 
     let anchorsLoaded = 0;
     anchors.forEach((idx) => {
       loadSingleFrame(idx, () => {
         anchorsLoaded++;
-        if (anchorsLoaded >= Math.min(8, anchors.length) && preloader && !preloader.classList.contains('fade-out')) {
+        if (anchorsLoaded >= Math.min(12, anchors.length) && preloader && !preloader.classList.contains('fade-out')) {
           preloader.classList.add('fade-out');
         }
       });
     });
 
-    // 3. Concurrent background worker pool for all intermediate frames
-    const BATCH_CONCURRENCY = 20;
+    // 3. High-concurrency worker pool for all intermediate frames
+    const BATCH_CONCURRENCY = 24;
     let nextIndex = 1;
 
     function loadNext() {
@@ -76,7 +75,7 @@
         if (progressFill) progressFill.style.width = `${pct}%`;
         if (loadPercentage) loadPercentage.textContent = `Loading Sanctuary... ${pct}%`;
 
-        if (loadedCount >= 15 && preloader && !preloader.classList.contains('fade-out')) {
+        if (loadedCount >= 25 && preloader && !preloader.classList.contains('fade-out')) {
           preloader.classList.add('fade-out');
         }
 
@@ -106,25 +105,31 @@
 
     isRequested[index] = true;
     const img = new Image();
+    img.decoding = 'async';
     img.src = FRAME_PATH(index);
 
-    img.onload = () => {
+    const onComplete = () => {
       images[index] = img;
       isLoaded[index] = true;
       loadedCount++;
       if (callback) callback();
 
-      // If user is currently looking at this frame or nearby, trigger re-render
+      // Trigger immediate redraw if user is at or next to this frame
       const currentTarget = Math.round(currentFrameFloat);
       if (Math.abs(currentTarget - index) <= 1) {
         renderFrame(currentFrameFloat);
       }
     };
 
-    img.onerror = () => {
-      isLoaded[index] = false;
-      if (callback) callback();
-    };
+    if (img.decode) {
+      img.decode().then(onComplete).catch(onComplete);
+    } else {
+      img.onload = onComplete;
+      img.onerror = () => {
+        isLoaded[index] = false;
+        if (callback) callback();
+      };
+    }
 
     images[index] = img;
   }
@@ -133,7 +138,7 @@
    * Prioritize downloading frames immediately around the user's scroll position
    */
   function prioritizeFrames(centerIdx) {
-    const radius = 10;
+    const radius = 15;
     for (let r = 0; r <= radius; r++) {
       const forward = centerIdx + r;
       const backward = centerIdx - r;
@@ -170,14 +175,14 @@
 
     let img = images[targetIdx];
 
-    if (!img || !img.complete || img.naturalWidth === 0) {
+    if (!img || !isLoaded[targetIdx] || img.naturalWidth === 0) {
       loadSingleFrame(targetIdx);
 
       let closestDist = Infinity;
       let closestImg = null;
 
       for (let i = 1; i <= TOTAL_FRAMES; i++) {
-        if (images[i] && images[i].complete && images[i].naturalWidth > 0) {
+        if (images[i] && isLoaded[i] && images[i].naturalWidth > 0) {
           const dist = Math.abs(i - targetIdx);
           if (dist < closestDist) {
             closestDist = dist;
@@ -189,7 +194,7 @@
       img = closestImg || lastRenderedImg;
     }
 
-    if (!img || !img.complete || img.naturalWidth === 0) {
+    if (!img || img.naturalWidth === 0) {
       if (lastRenderedImg) {
         img = lastRenderedImg;
       } else {
@@ -229,7 +234,7 @@
 
   /**
    * ==========================================================================
-   * 3. DIRECT PHYSICAL SCROLL CALCULATOR & LERP
+   * 3. DIRECT PHYSICAL SCROLL CALCULATOR & SMOOTH INERTIA LERP
    * ==========================================================================
    */
   function onScroll() {
@@ -245,13 +250,18 @@
     prioritizeFrames(Math.round(targetFrameFloat));
   }
 
-  function renderLoop() {
+  let lastTime = performance.now();
+  function renderLoop(now) {
     try {
-      const lerp = 0.18;
+      const dt = Math.min((now - lastTime) / 1000, 0.1);
+      lastTime = now;
+
+      // 60-120 FPS adaptive frame-rate lerp calculation
+      const lerpSpeed = 1 - Math.exp(-14 * dt);
       const diff = targetFrameFloat - currentFrameFloat;
 
       if (Math.abs(diff) > 0.001) {
-        currentFrameFloat += diff * lerp;
+        currentFrameFloat += diff * lerpSpeed;
         renderFrame(currentFrameFloat);
         updateCaptions();
       }
