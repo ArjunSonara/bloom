@@ -13,6 +13,7 @@
 
   const images = new Array(TOTAL_FRAMES + 1);
   const isLoaded = new Array(TOTAL_FRAMES + 1).fill(false);
+  const isRequested = new Array(TOTAL_FRAMES + 1).fill(false);
   let loadedCount = 0;
   let lastRenderedImg = null;
 
@@ -35,20 +36,36 @@
     { el: document.getElementById('step-4'), min: 0.88, max: 1.0 }
   ];
 
-  const toastContainer = document.getElementById('toastContainer');
-
   /**
    * ==========================================================================
-   * 1. CONCURRENT FRAME PRELOADER
+   * 1. CONCURRENT & ON-DEMAND FRAME PRELOADER
    * ==========================================================================
    */
   function initPreloader() {
+    // 1. Immediately request the first frame
     loadSingleFrame(1, () => {
       resizeCanvas();
       renderFrame(1);
     });
 
-    const BATCH_CONCURRENCY = 24;
+    // 2. Pre-fetch anchor keyframes every 12 frames across the whole video
+    // This gives instant global responsiveness across the entire scroll timeline
+    const anchors = [];
+    for (let i = 1; i <= TOTAL_FRAMES; i += 12) anchors.push(i);
+    if (anchors[anchors.length - 1] !== TOTAL_FRAMES) anchors.push(TOTAL_FRAMES);
+
+    let anchorsLoaded = 0;
+    anchors.forEach((idx) => {
+      loadSingleFrame(idx, () => {
+        anchorsLoaded++;
+        if (anchorsLoaded >= Math.min(8, anchors.length) && preloader && !preloader.classList.contains('fade-out')) {
+          preloader.classList.add('fade-out');
+        }
+      });
+    });
+
+    // 3. Concurrent background worker pool for all intermediate frames
+    const BATCH_CONCURRENCY = 20;
     let nextIndex = 1;
 
     function loadNext() {
@@ -73,23 +90,56 @@
   }
 
   function loadSingleFrame(index, callback) {
-    if (images[index] && isLoaded[index]) {
+    if (index < 1 || index > TOTAL_FRAMES) return;
+    if (isLoaded[index]) {
       if (callback) callback();
       return;
     }
+    if (isRequested[index]) {
+      if (callback && images[index]) {
+        const existingImg = images[index];
+        if (existingImg.complete) callback();
+        else existingImg.addEventListener('load', callback, { once: true });
+      }
+      return;
+    }
 
+    isRequested[index] = true;
     const img = new Image();
     img.src = FRAME_PATH(index);
+
     img.onload = () => {
       images[index] = img;
       isLoaded[index] = true;
       loadedCount++;
       if (callback) callback();
+
+      // If user is currently looking at this frame or nearby, trigger re-render
+      const currentTarget = Math.round(currentFrameFloat);
+      if (Math.abs(currentTarget - index) <= 1) {
+        renderFrame(currentFrameFloat);
+      }
     };
+
     img.onerror = () => {
       isLoaded[index] = false;
       if (callback) callback();
     };
+
+    images[index] = img;
+  }
+
+  /**
+   * Prioritize downloading frames immediately around the user's scroll position
+   */
+  function prioritizeFrames(centerIdx) {
+    const radius = 10;
+    for (let r = 0; r <= radius; r++) {
+      const forward = centerIdx + r;
+      const backward = centerIdx - r;
+      if (forward <= TOTAL_FRAMES) loadSingleFrame(forward);
+      if (backward >= 1) loadSingleFrame(backward);
+    }
   }
 
   /**
@@ -121,6 +171,8 @@
     let img = images[targetIdx];
 
     if (!img || !img.complete || img.naturalWidth === 0) {
+      loadSingleFrame(targetIdx);
+
       let closestDist = Infinity;
       let closestImg = null;
 
@@ -150,8 +202,8 @@
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
     const cw = window.innerWidth;
     const ch = window.innerHeight;
-    const iw = img.naturalWidth || 1280;
-    const ih = img.naturalHeight || 720;
+    const iw = img.naturalWidth || 1920;
+    const ih = img.naturalHeight || 1080;
 
     const imgRatio = iw / ih;
     const canvasRatio = cw / ch;
@@ -190,6 +242,7 @@
     scrollProgress = progress;
 
     targetFrameFloat = 1 + progress * (TOTAL_FRAMES - 1);
+    prioritizeFrames(Math.round(targetFrameFloat));
   }
 
   function renderLoop() {
