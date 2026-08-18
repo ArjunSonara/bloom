@@ -1,33 +1,19 @@
 /**
  * ============================================================================
- * MAISON DE BLOOM — 60-120 FPS ULTRA-SMOOTH CINEMATIC SCROLL ENGINE
- * 100% Focused on the Floral Palace Walkthrough
+ * MAISON DE BLOOM — ULTRA-LITE SMOOTH CLOUDINARY VIDEO SCROLL ENGINE
+ * 100% Focused on buttery 60-120 FPS video walkthrough experience
  * ============================================================================
  */
 
 (function () {
   'use strict';
 
-  const TOTAL_FRAMES = 430;
-  const FRAME_PATH = (i) => `frames/frame_${String(i).padStart(4, '0')}.webp`;
-
-  const images = new Array(TOTAL_FRAMES + 1);
-  const isLoaded = new Array(TOTAL_FRAMES + 1).fill(false);
-  const isRequested = new Array(TOTAL_FRAMES + 1).fill(false);
-  let loadedCount = 0;
-  let lastRenderedImg = null;
-
-  let currentFrameFloat = 1;
-  let targetFrameFloat = 1;
-  let scrollProgress = 0;
-
   // DOM Elements
+  const video = document.getElementById('scroll-video');
   const preloader = document.getElementById('preloader');
   const progressFill = document.getElementById('progress-fill');
   const loadPercentage = document.getElementById('load-percentage');
 
-  const canvas = document.getElementById('scroll-canvas');
-  const ctx = canvas ? canvas.getContext('2d', { alpha: false, desynchronized: true }) : null;
   const steps = [
     { el: document.getElementById('step-0'), min: 0, max: 0.14 },
     { el: document.getElementById('step-1'), min: 0.18, max: 0.38 },
@@ -36,205 +22,75 @@
     { el: document.getElementById('step-4'), min: 0.88, max: 1.0 }
   ];
 
+  let scrollProgress = 0;
+  let targetTime = 0;
+  let currentTime = 0;
+  let isVideoReady = false;
+  let isSeeking = false;
+
   /**
    * ==========================================================================
-   * 1. ULTRA-FAST ASYNC PRELOADER WITH PRE-DECODING
+   * 1. VIDEO PRELOADER & INITIALIZATION
    * ==========================================================================
    */
-  function initPreloader() {
-    // 1. Immediately request & decode the first frame
-    loadSingleFrame(1, () => {
-      resizeCanvas();
-      renderFrame(1);
-    });
+  function initVideo() {
+    if (!video) return;
 
-    // 2. Pre-fetch anchor keyframes across the whole timeline
-    const anchors = [];
-    for (let i = 1; i <= TOTAL_FRAMES; i += 10) anchors.push(i);
-    if (anchors[anchors.length - 1] !== TOTAL_FRAMES) anchors.push(TOTAL_FRAMES);
+    video.pause();
+    video.muted = true;
 
-    let anchorsLoaded = 0;
-    anchors.forEach((idx) => {
-      loadSingleFrame(idx, () => {
-        anchorsLoaded++;
-        if (anchorsLoaded >= Math.min(12, anchors.length) && preloader && !preloader.classList.contains('fade-out')) {
-          preloader.classList.add('fade-out');
-        }
-      });
-    });
-
-    // 3. High-concurrency worker pool for all intermediate frames
-    const BATCH_CONCURRENCY = 24;
-    let nextIndex = 1;
-
-    function loadNext() {
-      if (nextIndex > TOTAL_FRAMES) return;
-      const idx = nextIndex++;
-      loadSingleFrame(idx, () => {
-        const pct = Math.round((loadedCount / TOTAL_FRAMES) * 100);
+    // Fast buffer tracking
+    function updateBufferProgress() {
+      if (video.buffered.length > 0 && video.duration > 0) {
+        const bufferedEnd = video.buffered.end(video.buffered.length - 1);
+        const pct = Math.min(100, Math.round((bufferedEnd / video.duration) * 100));
         if (progressFill) progressFill.style.width = `${pct}%`;
         if (loadPercentage) loadPercentage.textContent = `Loading Sanctuary... ${pct}%`;
+      }
+    }
 
-        if (loadedCount >= 25 && preloader && !preloader.classList.contains('fade-out')) {
+    function onVideoReady() {
+      if (isVideoReady) return;
+      isVideoReady = true;
+      if (progressFill) progressFill.style.width = '100%';
+      if (loadPercentage) loadPercentage.textContent = 'Sanctuary Ready';
+      if (preloader) {
+        setTimeout(() => {
           preloader.classList.add('fade-out');
-        }
-
-        loadNext();
-      });
-    }
-
-    for (let i = 0; i < BATCH_CONCURRENCY; i++) {
-      loadNext();
-    }
-  }
-
-  function loadSingleFrame(index, callback) {
-    if (index < 1 || index > TOTAL_FRAMES) return;
-    if (isLoaded[index]) {
-      if (callback) callback();
-      return;
-    }
-    if (isRequested[index]) {
-      if (callback && images[index]) {
-        const existingImg = images[index];
-        if (existingImg.complete) callback();
-        else existingImg.addEventListener('load', callback, { once: true });
+        }, 150);
       }
-      return;
+      onScroll();
     }
 
-    isRequested[index] = true;
-    const img = new Image();
-    img.decoding = 'async';
-    img.src = FRAME_PATH(index);
+    video.addEventListener('progress', updateBufferProgress, { passive: true });
+    video.addEventListener('loadeddata', () => {
+      updateBufferProgress();
+      onVideoReady();
+    }, { once: true });
+    video.addEventListener('canplay', onVideoReady, { once: true });
+    video.addEventListener('canplaythrough', onVideoReady, { once: true });
 
-    const onComplete = () => {
-      images[index] = img;
-      isLoaded[index] = true;
-      loadedCount++;
-      if (callback) callback();
-
-      // Trigger immediate redraw if user is at or next to this frame
-      const currentTarget = Math.round(currentFrameFloat);
-      if (Math.abs(currentTarget - index) <= 1) {
-        renderFrame(currentFrameFloat);
+    // Track seeking state for hardware decoder optimization
+    video.addEventListener('seeking', () => { isSeeking = true; }, { passive: true });
+    video.addEventListener('seeked', () => {
+      isSeeking = false;
+      // Immediately apply latest target if user moved significantly while seeking
+      if (Math.abs(video.currentTime - currentTime) > 0.02) {
+        video.currentTime = currentTime;
       }
-    };
+    }, { passive: true });
 
-    if (img.decode) {
-      img.decode().then(onComplete).catch(onComplete);
+    // Fallback: If video is already cached or ready
+    if (video.readyState >= 2) {
+      onVideoReady();
     } else {
-      img.onload = onComplete;
-      img.onerror = () => {
-        isLoaded[index] = false;
-        if (callback) callback();
-      };
-    }
-
-    images[index] = img;
-  }
-
-  /**
-   * Prioritize downloading frames immediately around the user's scroll position
-   */
-  function prioritizeFrames(centerIdx) {
-    const radius = 15;
-    for (let r = 0; r <= radius; r++) {
-      const forward = centerIdx + r;
-      const backward = centerIdx - r;
-      if (forward <= TOTAL_FRAMES) loadSingleFrame(forward);
-      if (backward >= 1) loadSingleFrame(backward);
+      setTimeout(onVideoReady, 3000);
     }
   }
 
   /**
    * ==========================================================================
-   * 2. CANVAS RENDERING ENGINE (ZERO-BLACK-FRAME RETENTION)
-   * ==========================================================================
-   */
-  function resizeCanvas() {
-    if (!canvas || !ctx) return;
-    const dpr = Math.min(window.devicePixelRatio || 1, 2);
-    const width = window.innerWidth;
-    const height = window.innerHeight;
-
-    canvas.width = Math.round(width * dpr);
-    canvas.height = Math.round(height * dpr);
-    canvas.style.width = `${width}px`;
-    canvas.style.height = `${height}px`;
-
-    ctx.imageSmoothingEnabled = true;
-    ctx.imageSmoothingQuality = 'high';
-
-    renderFrame(Math.round(currentFrameFloat));
-  }
-
-  function renderFrame(frameNum) {
-    if (!canvas || !ctx) return;
-    const targetIdx = Math.max(1, Math.min(TOTAL_FRAMES, Math.round(frameNum)));
-
-    let img = images[targetIdx];
-
-    if (!img || !isLoaded[targetIdx] || img.naturalWidth === 0) {
-      loadSingleFrame(targetIdx);
-
-      let closestDist = Infinity;
-      let closestImg = null;
-
-      for (let i = 1; i <= TOTAL_FRAMES; i++) {
-        if (images[i] && isLoaded[i] && images[i].naturalWidth > 0) {
-          const dist = Math.abs(i - targetIdx);
-          if (dist < closestDist) {
-            closestDist = dist;
-            closestImg = images[i];
-          }
-        }
-      }
-
-      img = closestImg || lastRenderedImg;
-    }
-
-    if (!img || img.naturalWidth === 0) {
-      if (lastRenderedImg) {
-        img = lastRenderedImg;
-      } else {
-        return;
-      }
-    }
-
-    lastRenderedImg = img;
-
-    const dpr = Math.min(window.devicePixelRatio || 1, 2);
-    const cw = window.innerWidth;
-    const ch = window.innerHeight;
-    const iw = img.naturalWidth || 1920;
-    const ih = img.naturalHeight || 1080;
-
-    const imgRatio = iw / ih;
-    const canvasRatio = cw / ch;
-    let dw, dh, ox, oy;
-
-    if (canvasRatio > imgRatio) {
-      dw = cw;
-      dh = cw / imgRatio;
-      ox = 0;
-      oy = (ch - dh) / 2;
-    } else {
-      dh = ch;
-      dw = ch * imgRatio;
-      ox = (cw - dw) / 2;
-      oy = 0;
-    }
-
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    ctx.imageSmoothingEnabled = true;
-    ctx.imageSmoothingQuality = 'high';
-    ctx.drawImage(img, ox, oy, dw, dh);
-  }
-
-  /**
-   * ==========================================================================
-   * 3. DIRECT PHYSICAL SCROLL CALCULATOR & SMOOTH INERTIA LERP
+   * 2. SCROLL CALCULATOR
    * ==========================================================================
    */
   function onScroll() {
@@ -246,23 +102,34 @@
     progress = Math.max(0, Math.min(1, progress));
     scrollProgress = progress;
 
-    targetFrameFloat = 1 + progress * (TOTAL_FRAMES - 1);
-    prioritizeFrames(Math.round(targetFrameFloat));
+    const duration = (video && video.duration && !isNaN(video.duration)) ? video.duration : 7.25;
+    targetTime = progress * duration;
   }
 
+  /**
+   * ==========================================================================
+   * 3. ULTRA-SMOOTH RAF RENDER LOOP (60-120 FPS ADAPTIVE LERP)
+   * ==========================================================================
+   */
   let lastTime = performance.now();
   function renderLoop(now) {
     try {
       const dt = Math.min((now - lastTime) / 1000, 0.1);
       lastTime = now;
 
-      // 60-120 FPS adaptive frame-rate lerp calculation
-      const lerpSpeed = 1 - Math.exp(-14 * dt);
-      const diff = targetFrameFloat - currentFrameFloat;
+      // Exponential damping for silky smooth motion
+      const lerpSpeed = 1 - Math.exp(-16 * dt);
+      const diff = targetTime - currentTime;
 
-      if (Math.abs(diff) > 0.001) {
-        currentFrameFloat += diff * lerpSpeed;
-        renderFrame(currentFrameFloat);
+      if (Math.abs(diff) > 0.0005) {
+        currentTime += diff * lerpSpeed;
+        if (video && video.readyState >= 1 && !isSeeking) {
+          if ('fastSeek' in video) {
+            video.fastSeek(currentTime);
+          } else {
+            video.currentTime = currentTime;
+          }
+        }
         updateCaptions();
       }
     } catch (err) {
@@ -282,7 +149,7 @@
 
   /**
    * ==========================================================================
-   * 4. FLOATING ROSE PETALS
+   * 4. AMBIENT ROSE PETAL PARTICLES
    * ==========================================================================
    */
   function initPetals() {
@@ -295,19 +162,19 @@
     window.addEventListener('resize', () => {
       w = pCanvas.width = window.innerWidth;
       h = pCanvas.height = window.innerHeight;
-    });
+    }, { passive: true });
 
     const petals = [];
-    for (let i = 0; i < 28; i++) {
+    for (let i = 0; i < 26; i++) {
       petals.push({
         x: Math.random() * w,
         y: Math.random() * h,
-        size: 7 + Math.random() * 9,
-        vy: 0.5 + Math.random() * 1.0,
-        vx: (Math.random() - 0.5) * 0.6,
+        size: 7 + Math.random() * 8,
+        vy: 0.5 + Math.random() * 0.9,
+        vx: (Math.random() - 0.5) * 0.5,
         angle: Math.random() * 360,
-        spin: (Math.random() - 0.5) * 1.2,
-        opacity: 0.2 + Math.random() * 0.4,
+        spin: (Math.random() - 0.5) * 1.0,
+        opacity: 0.25 + Math.random() * 0.35,
         color: Math.random() > 0.5 ? '#fcd5ce' : '#f7d6e0'
       });
     }
@@ -342,16 +209,12 @@
 
   // --- Initialize ---
   window.addEventListener('DOMContentLoaded', () => {
-    initPreloader();
+    initVideo();
     initPetals();
-    resizeCanvas();
     onScroll();
 
     window.addEventListener('scroll', onScroll, { passive: true });
-    window.addEventListener('resize', () => {
-      resizeCanvas();
-      onScroll();
-    });
+    window.addEventListener('resize', onScroll, { passive: true });
 
     requestAnimationFrame(renderLoop);
   });

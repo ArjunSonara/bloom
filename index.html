@@ -6,7 +6,9 @@
   <title>Maison de Bloom — The Sanctuary of Eternal Spring</title>
   <meta name="description" content="An immersive scroll-driven journey through the blooming floral palace of Maison de Bloom.">
   
-  <!-- Google Fonts -->
+  <!-- Preconnect & CDN -->
+  <link rel="preconnect" href="https://res.cloudinary.com" crossorigin>
+  <link rel="dns-prefetch" href="https://res.cloudinary.com">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,400&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
@@ -37,9 +39,9 @@
 
 
 
-  <!-- FIXED FULL-SCREEN CINEMATIC CANVAS (100% Unobstructed Video Walkthrough) -->
+  <!-- FIXED FULL-SCREEN CINEMATIC VIDEO (Direct Cloudinary Video Walkthrough) -->
   <div class="fixed-canvas-container" id="fixedCanvasContainer">
-    <canvas id="scroll-canvas"></canvas>
+    <video id="scroll-video" src="https://res.cloudinary.com/yj2iuoea/video/upload/v1787062955/ezgif-443550a89265eac8.mp4" playsinline webkit-playsinline muted preload="auto" crossorigin="anonymous"></video>
     <div class="cinematic-vignette"></div>
 
     <!-- Minimalist Floating Cinematic Captions -->
